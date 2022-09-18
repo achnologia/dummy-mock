@@ -91,4 +91,31 @@ public class MockTests
         // Assert
         
     }
+    
+    [Fact]
+    public async void Should_Mock_Chain()
+    {
+        // Arrange
+        var newHelloWorldReturn = "Mocked hello world";
+        var newParamReturn = int.MaxValue;
+        var mock = new DummyMock<IService>();
+
+        // Act
+        mock
+            .Setup(x => x.GetHelloWorld(), () => newHelloWorldReturn)
+            .Setup(x => x.GetHelloWorldAsync(), () => Task.FromResult(newHelloWorldReturn))
+            .Setup(x => x.ProcessParam(int.MinValue), () => newParamReturn)
+            .Setup(x => x.ProcessParamAsync(int.MinValue), () => Task.FromResult(newParamReturn));
+        
+        var helloWorldResult = mock.Object.GetHelloWorld();
+        var asyncHelloWorldResult = await mock.Object.GetHelloWorldAsync();
+        var paramResult = mock.Object.ProcessParam(int.MinValue);
+        var asyncParamResult = await mock.Object.ProcessParamAsync(int.MinValue);
+
+        // Assert
+        Assert.Equal(newHelloWorldReturn, helloWorldResult);
+        Assert.Equal(newHelloWorldReturn, asyncHelloWorldResult);
+        Assert.Equal(newParamReturn, paramResult);
+        Assert.Equal(newParamReturn, asyncParamResult);
+    }
 }
