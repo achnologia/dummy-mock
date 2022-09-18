@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dummy-mock", "Console\Conso
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mock", "Mock\Mock.csproj", "{D04E028C-87A1-4243-B5C1-78780C84C3BE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mock.Tests", "Mock.Tests\Mock.Tests.csproj", "{8B68B020-3849-4B72-85E4-285C41ECF8B0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{D04E028C-87A1-4243-B5C1-78780C84C3BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D04E028C-87A1-4243-B5C1-78780C84C3BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D04E028C-87A1-4243-B5C1-78780C84C3BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B68B020-3849-4B72-85E4-285C41ECF8B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B68B020-3849-4B72-85E4-285C41ECF8B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B68B020-3849-4B72-85E4-285C41ECF8B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B68B020-3849-4B72-85E4-285C41ECF8B0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
