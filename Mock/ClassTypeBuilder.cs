@@ -2,6 +2,7 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Mock.MethodBuilders;
 
 namespace Mock;
 
@@ -39,27 +40,79 @@ public class ClassTypeBuilder
     }}
 ".Trim();
 
-    public Type Build(Type destinationType)
+    public Type Build<T>()
     {
-        if (destinationType is null)
-            throw new ArgumentException("Destination type is missing", nameof(destinationType));
+        var destinationType = typeof(T);
 
         var newClassName = $"{destinationType.Name}Mock";
 
-        var referenceTypes = GetMethods(destinationType).Select(x => x.ReturnType)
-            .Concat(GetMethods(destinationType).SelectMany(xx => xx.GetParameters().Select(p => p.ParameterType))).ToList();
-
-        var dynamicUsing = referenceTypes.Select(x => $"using {x.Namespace};").Distinct();
-        var dynamicUsingStr = string.Join(Environment.NewLine, dynamicUsing);
-
+        var dynamicUsingStr = BuildUsingStr(destinationType);
         var methodsStr = BuildMethodsStr(destinationType);
         
         var classSource = string.Format(_classTemplate, destinationType.Namespace, newClassName, destinationType.FullName, dynamicUsingStr, methodsStr);
 
+        var compilation = BuildCompilation(destinationType, classSource);
+
+        var type = BuildType(compilation, destinationType.Namespace, newClassName);
+
+        return type;
+    }
+
+    private string BuildUsingStr(Type type)
+    {
+        var referenceTypes = GetMethods(type).Select(x => x.ReturnType)
+            .Concat(GetMethods(type).SelectMany(xx => xx.GetParameters().Select(p => p.ParameterType)));
+
+        var dynamicUsing = referenceTypes.Select(x => $"using {x.Namespace};").Distinct();
+        var dynamicUsingStr = string.Join(Environment.NewLine, dynamicUsing);
+
+        return dynamicUsingStr;
+    }
+    
+    private string BuildMethodsStr(Type type)
+    {
+        var sb = new StringBuilder();
+        var methods = GetMethods(type);
+
+        var mbEngine = new MethodBuilderEngine.Builder()
+            .WithVoidMethodBuilder()
+            .WithTaskMethodBuilder()
+            .Build();
+
+        foreach (var method in methods)
+        {
+            mbEngine.BuildMethod(sb, method);
+        }
+        
+        return sb.ToString();
+    }
+
+    private IEnumerable<MethodInfo> GetMethods(Type type)
+    {
+        return type.GetMethods().Where(x => x.IsAbstract || x.IsVirtual);
+    }
+    
+    private CSharpCompilation BuildCompilation(Type type, string classSource)
+    {
+        var assemblies = BuildReferences(type);
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(classSource);
+        
+        var compilation = CSharpCompilation
+            .Create(type.Namespace)
+            .AddSyntaxTrees(syntaxTree)
+            .AddReferences(assemblies)
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default));
+
+        return compilation;
+    }
+    
+    private IEnumerable<MetadataReference> BuildReferences(Type type)
+    {
         var assemblies = new List<MetadataReference>
         {
             MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(destinationType.Assembly.Location)
+            MetadataReference.CreateFromFile(type.Assembly.Location)
         };
 
         var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location);
@@ -70,68 +123,7 @@ public class ClassTypeBuilder
         assemblies.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")));
         assemblies.Add(MetadataReference.CreateFromFile(Assembly.GetEntryAssembly().Location));
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(classSource);
-        
-        var compilation = CSharpCompilation
-            .Create(destinationType.Namespace)
-            .AddSyntaxTrees(syntaxTree)
-            .AddReferences(assemblies)
-            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default));
-
-        var type = BuildType(compilation, destinationType.Namespace, newClassName);
-
-        return type;
-    }
-
-    private string BuildMethodsStr(Type type)
-    {
-        var sb = new StringBuilder();
-        var methods = GetMethods(type);
-
-        foreach (var method in methods)
-        {
-            var returnType = method.ReturnType.ToString();
-
-            if (returnType == "System.Void")
-            {
-                returnType = "void";
-            }
-            
-            if (method.ReturnType.IsGenericType)
-            {
-                returnType = returnType.Replace("`1[", "<").Replace("]", ">");
-            }
-
-            var parametersStr = string.Empty;
-            var parameters = method.GetParameters();
-            
-            if (parameters.Any())
-            {
-                parametersStr = string.Join(',', parameters.Select(x => $"{x.ParameterType} {x.Name}"));
-            }
-            
-            sb.AppendLine($"public {returnType} {method.Name}({parametersStr})");
-            sb.AppendLine("{");
-            if (returnType != "void" && returnType != "System.Threading.Tasks.Task")
-            {
-                sb.AppendLine($"var result = GetMockedMethodResult(\"{method.Name}\");");
-                sb.AppendLine($"return ({returnType})result;");
-            }
-
-            if (returnType == "System.Threading.Tasks.Task")
-            {
-                sb.AppendLine($"return System.Threading.Tasks.Task.CompletedTask;");
-            }
-            sb.AppendLine("}");
-            sb.AppendLine("");
-        }
-        
-        return sb.ToString();
-    }
-    
-    private IEnumerable<MethodInfo> GetMethods(Type type)
-    {
-        return type.GetMethods().Where(x => x.IsAbstract || x.IsVirtual);
+        return assemblies;
     }
 
     private Type BuildType(CSharpCompilation compilation, string newNamespace, string className)
@@ -151,6 +143,7 @@ public class ClassTypeBuilder
         var newTypeFullName = $"{newNamespace}.{className}";
 
         var type = assembly.GetType(newTypeFullName);
+        
         return type;
     }
 }

@@ -22,7 +22,7 @@ public class DummyMock<T> where T : class
 
     private T CreateInstance()
     {
-        var classType = _typeBuilder.Build(typeof(T));
+        var classType = _typeBuilder.Build<T>();
         
         return (T)Activator.CreateInstance(classType, _setups)!;
     }
